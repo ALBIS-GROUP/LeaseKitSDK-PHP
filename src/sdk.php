@@ -152,8 +152,8 @@ class Albis{
     /** change Albis and auth0-password
     *   @param $albisNewPassword new password for albis
     *   @param $auth0NewPassword new auth0 passwort
-    *   @param [$returnType] demanded return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
-    *   @return response from Albis in demanded return type
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
     function changePassword($albisNewPassword, $auth0NewPassword, $returnType = RETURN_TYPE_STANDARD){
@@ -162,8 +162,8 @@ class Albis{
     }
 
     /** send a test request to Albis
-    *   @param [$returnType] demanded return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
-    *   @return response from Albis in demanded return type
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
     function doPing($returnType = RETURN_TYPE_STANDARD){
@@ -173,8 +173,8 @@ class Albis{
 
     /** send an echo request to Albis
     *   @param $data data to echo back
-    *   @param [$returnType] demanded return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
-    *   @return response from Albis in demanded return type
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
     function doEcho($data, $returnType = RETURN_TYPE_STANDARD){
@@ -184,8 +184,8 @@ class Albis{
 
     /** find an Application and return its data
     *   @param $id Albis application id
-    *   @param [$returnType] demanded return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
-    *   @return response from Albis in demanded return type
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
     function findApplication($id, $returnType = RETURN_TYPE_STANDARD){
@@ -195,8 +195,8 @@ class Albis{
 
     /** get an Application's status
     *   @param $id Albis application id
-    *   @param [$returnType] demanded return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
-    *   @return response from Albis in demanded return type
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
     function getApplicationStatus($id, $returnType = RETURN_TYPE_STANDARD){
@@ -204,14 +204,82 @@ class Albis{
         return Albis::formatJsonReturn(Albis::sendPost('applications-status',array("applicationId"=>$id),$token, false, "GET"),$returnType);
     }
 
-    /** TODO */
+    /** updates an application 
+    *   @param $applicationObject object or associative array with application values.
+    *   @param {number} $applicationObject.id - application number, which will be updated
+    *   @param {boolean}$applicationObject.contactByEmail - is contact by email required
+    *   @param {number} $applicationObject.contractType - contract type
+    *   @param {number} $applicationObject.downPayment - down payment
+    *   @param {string} $applicationObject.iban - iban
+    *   @param {Object} $applicationObject.lessee - lessee data
+    *   @param {string} $applicationObject.lessee.city - lessee city
+    *   @param {string} $applicationObject.lessee.email - lessee email
+    *   @param {number} $applicationObject.lessee.legalForm - lessee legal form
+    *   @param {string} $applicationObject.lessee.name - lessee name
+    *   @param {string} $applicationObject.lessee.phoneNumber - lessee phone number
+    *   @param {string} $applicationObject.lessee.street - lessee street
+    *   @param {string} $applicationObject.lessee.zipCode - lessee zip code
+    *   @param {number} $applicationObject.leaseTerm - lease term (returned from getRates() method)
+    *   @param {string} $applicationObject.object - name of the object (80 char max)
+    *   @param {number} $applicationObject.paymentMethod - payment method
+    *   @param {number} $applicationObject.productGroup - product group
+    *   @param {string} $applicationObject.promotionId - lease term (returned from getRates() if conditions matched any promotion)
+    *   @param {string} $applicationObject.provision - defines how much commission, retailer wants to receives for each deal. Possible $applicationObject min: 0, max: 5. Default 0
+    *   @param {number} $applicationObject.purchasePrice - purchase price (object value)
+    *   @param {number} $applicationObject.rate - rate (returned from getRates() method)
+    *   @param {string} $applicationObject.reference - application reference (helper for shop employees) 
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    */
     function updateApplication($applicationObject, $returnType = RETURN_TYPE_STANDARD){
         $token = $this->getAlbisToken();
         Albis::setApplicationObjectStandardValues($applicationObject);
         return Albis::formatJsonReturn(Albis::sendPost('application',json_encode($applicationObject),$token, true, "PUT"),$returnType);
     }
 
-    /** TODO */
+    /** saves (inserts) an application 
+    *   @param $applicationObject object or associative array with application values.
+        *   {Object} $applicationObject - An object with application data
+    *   {boolean} $applicationObject.contactByEmail - is contact by email required
+    *   {number} $applicationObject.contractType - contract type
+    *   {number} $applicationObject.downPayment - down payment
+    *   {number} $applicationObject.finalPayment - final payment (returned from getRates() method)
+    *   {string} $applicationObject.iban - iban
+    *   {Object} $applicationObject.lessee - lessee data
+    *   {string} $applicationObject.lessee.city - lessee city
+    *   {string} $applicationObject.lessee.email - lessee email
+    *   {number} $applicationObject.lessee.legalForm - lessee legal form
+    *   {string} $applicationObject.lessee.name - lessee name
+    *   {string} $applicationObject.lessee.phoneNumber - lessee phone number
+    *   {string} $applicationObject.lessee.street - lessee street
+    *   {string} $applicationObject.lessee.zipCode - lessee zip code
+    *   {Object} $applicationObject.lessee.manager - lessee's manager data
+    *   {string} $applicationObject.lessee.manager.birthDate - lessee's manager birth date (format required: "DD.MM.YYYY")
+    *   {string} $applicationObject.lessee.manager.city - lessee's manager city
+    *   {string} $applicationObject.lessee.manager.firstName - lessee's manager first name
+    *   {string} $applicationObject.lessee.manager.lastName - lessee's manager last name
+    *   {string} $applicationObject.lessee.manager.salutation - lessee's manager salutation form
+    *   {string} $applicationObject.lessee.manager.street - lessee's manager street
+    *   {string} $applicationObject.lessee.manager.zipCode - lessee's manager zip code
+    *   {number} $applicationObject.leaseTerm - lease term (returned from getRates() method)
+    *   {string} $applicationObject.object - name of the object (80 char max)
+    *   {number} $applicationObject.paymentMethod - payment method
+    *   {number} $applicationObject.productGroup - product group
+    *   {string} $applicationObject.promotionId - lease term (returned from getRates() if conditions matched any promotion)
+    *   {number} $applicationObject.purchasePrice - purchase price (object value)
+    *   {number} $applicationObject.rate - rate (returned from getRates() method)
+    *   {number} $applicationObject.rateWithInsurance - rate with insurance (returned from getRates() method)
+    *   {string} $applicationObject.reference - application reference (helper for shop employees)
+    *   {Object} $applicationObject.retailer - retailer (supplier) data - a company, which stores the object
+    *   {string} $applicationObject.retailer.city - retailer (supplier) city
+    *   {string} $applicationObject.retailer.email - retailer (supplier) email
+    *   {string} $applicationObject.retailer.name - retailer (supplier) name
+    *   {string} $applicationObject.retailer.street - retailer (supplier) street
+    *   {string} $applicationObject.retailer.telnr - retailer (supplier) phone number
+    *   {string} $applicationObject.retailer.zipCode - retailer (supplier) zip code
+    *   {string} $applicationObject.receiverEndpoint - endpoint address where requests about application/documentation updates should be delivered (optional)
+    *   {Object[]} $applicationObject.receiverFailEmails - array of string emails where info about connection with reveiver endpoint should be delivered (optional)
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    */
     function saveApplication($applicationObject, $returnType = RETURN_TYPE_STANDARD){
         $token = $this->getAlbisToken();
         Albis::setApplicationObjectStandardValues($applicationObject);
@@ -242,8 +310,8 @@ class Albis{
     }
 
     /** returns legal form definitions
-    *   @param [$returnType] demanded return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
-    *   @return response from Albis in demanded return type
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
     function getLegalForms($returnType = RETURN_TYPE_STANDARD){
@@ -260,8 +328,8 @@ class Albis{
     *       "productGroup" id of product group
     *       "purchasePrice" amount of purchase price
     *       "provision" provision type id
-    *   @param [$returnType] demanded return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
-    *   @return response from Albis in demanded return type
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
     function getRatesByAssoc($assoc, $returnType = RETURN_TYPE_STANDARD){
@@ -277,8 +345,8 @@ class Albis{
     *   @param $productGroup id of product group
     *   @param $purchasePrice amount of purchase price
     *   @param $provision provision type id
-    *   @param [$returnType] demanded return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
-    *   @return response from Albis in demanded return type
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
     function getRates($contractType,$downPayment,$object,$paymentMethod,$productGroup,$purchasePrice,$provision,$returnType = RETURN_TYPE_STANDARD){
@@ -294,8 +362,8 @@ class Albis{
     }
 
     /** returns salutation definitions
-    *   @param [$returnType] demanded return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
-    *   @return response from Albis in demanded return type
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
     function getSalutations($returnType = RETURN_TYPE_STANDARD){
@@ -304,8 +372,8 @@ class Albis{
     }
 
     /** returns product group definitions
-    *   @param [$returnType] demanded return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
-    *   @return response from Albis in demanded return type
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
     function getProductGroups($returnType = RETURN_TYPE_STANDARD){
@@ -359,7 +427,14 @@ class Albis{
         if($close)exit();
     }
 
-    //TODO
+    /** uploads documents to an existing application
+    *   @param $applicationId Albis application id    
+    *   @param $documentArray array of document objects or associative arrays
+    *   @param {number} $documentArray[].art - document type number (possible values: 1 for Identity card, 2 for Acquired possession form, 3 for Signed contract, 4 for Direct debit authorization, 99 for miscellaneous)
+    *   @param {string} $documentArray[].ext - file extension (possible values: 'pdf', 'jpg', 'jpeg', 'png')
+    *   @param {string} $documentArray[].doc - string created by file encoding using base64
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    */
     function uploadDocuments($applicationId,$documentArray,$returnType = RETURN_TYPE_STANDARD){
           if(!is_array($documentArray)){
               $documentArray = [$documentArray];
@@ -406,7 +481,7 @@ class Albis{
     /** transfers / formats a given JSON-String into either a raw text,
     *   an associative array or a php-object
     *   @param $json the json string to be formatted
-    *   @param $returnType demanded return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param $returnType requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
     */
     function formatJsonReturn($json,$returnType){
         if($returnType == RETURN_TYPE_OBJECT){
@@ -602,6 +677,4 @@ class Albis{
         }
     }
 }
-
-
  ?>
