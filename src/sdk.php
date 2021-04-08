@@ -284,6 +284,16 @@ class Albis{
         $token = $this->getAlbisToken();
         Albis::setApplicationObjectStandardValues($applicationObject);
         return Albis::formatJsonReturn(Albis::sendPost('application',json_encode($applicationObject),$token, true, "POST"),$returnType);
+    }                
+    
+    /** returns payment method definitions
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
+    *   @throws Exception if endpoint declines request or problems in token aquisition
+    */
+    function getPaymentMethods($returnType = RETURN_TYPE_STANDARD){
+        $token = $this->getAlbisToken();
+        return Albis::formatJsonReturn(Albis::sendPost('payment-methods',[],$token, false, "GET"),$returnType);
     }
 
     static function setApplicationObjectStandardValues(&$applicationObject){
