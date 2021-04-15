@@ -242,7 +242,6 @@ class Albis{
     *   {boolean} $applicationObject.contactByEmail - is contact by email required
     *   {number} $applicationObject.contractType - contract type
     *   {number} $applicationObject.downPayment - down payment
-    *   {number} $applicationObject.finalPayment - final payment (returned from getRates() method)
     *   {string} $applicationObject.iban - iban
     *   {Object} $applicationObject.lessee - lessee data
     *   {string} $applicationObject.lessee.city - lessee city
@@ -294,6 +293,16 @@ class Albis{
     function getPaymentMethods($returnType = RETURN_TYPE_STANDARD){
         $token = $this->getAlbisToken();
         return Albis::formatJsonReturn(Albis::sendPost('payment-methods',[],$token, false, "GET"),$returnType);
+    }
+
+    /** returns contract type definitions
+    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
+    *   @throws Exception if endpoint declines request or problems in token aquisition
+    */
+    function getContractTypes($returnType = RETURN_TYPE_STANDARD){
+        $token = $this->getAlbisToken();
+        return Albis::formatJsonReturn(Albis::sendPost('contract-types',[],$token, false, "GET"),$returnType);
     }
 
     static function setApplicationObjectStandardValues(&$applicationObject){
