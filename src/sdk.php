@@ -5,7 +5,7 @@ namespace Albis\Sdk;
 set_time_limit(120);
 
 //-------------- final constants -------------
-define("SDK_VERSION",1);
+define("SDK_VERSION","v1");
 /** set to true to echo information regarding sent requests */
 define("DEBUG_REQUESTS",false);
 /** points to folder for configuration includes */
