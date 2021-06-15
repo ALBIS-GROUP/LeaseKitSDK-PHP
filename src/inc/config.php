@@ -1,5 +1,5 @@
 <?php 
-$ENDPOINT = 'https://mzgz6czl6h.execute-api.eu-central-1.amazonaws.com';
+$ENDPOINT = '';
 $API_STAGE = 'staging';
 /** use cURL package for requests. This needs curl to be installed in your php environment, but allows for more fine-grained error-handling*/
 $USE_CURL = true;
