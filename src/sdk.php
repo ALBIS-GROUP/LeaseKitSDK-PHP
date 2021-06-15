@@ -601,7 +601,23 @@ class Albis{
     *   @throws Exception if version is not "staging" nor a numeric value identical to the SDK version
     */
     static function checkVersion($version){
-        if(1 !== preg_match('/^v[1-9]+$|^staging$/',$version)){
+       // if(1 !== preg_match('/^v[0-9]+$|^staging$/',$version)){
+       //Regex unneccessarily slow; doing it by hand
+        $vld = $version == 'staging';
+        if(!$vld){
+            $charArray = str_split($version);
+            $len = sizeof($charArray);
+            if($len > 1 && $charArray[0] == 'v'){
+                $vld = true;
+                for($i = 1; $i < $len; ++$i){
+                    if(!is_numeric($charArray[$i])){
+                        $vld = false;
+                        break;
+                    }
+                }  
+            }
+        }
+        if(!$vld){
             Albis::error('invalid API-Version: ' . $version,2,true);
         }
         if(!($version == SDK_VERSION || $version == 'staging')){
