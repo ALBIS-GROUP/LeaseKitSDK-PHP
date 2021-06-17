@@ -1,7 +1,11 @@
 <?php
 require('sdk.php');
+require('AlbisConfig.php');
+$ENDPOINT = "";
+$API_STAGE = "staging";
+$config = new AlbisConfig($ENDPOINT,$API_STAGE);
 if(isset($_GET['call'])){
-    $albis = new Albis\Sdk\Albis();
+    $albis = new Albis\Sdk\Albis($config);
     if($_GET['call'] == 'token'){
         echo $albis->getAlbisToken();
     }else if($_GET['call'] == 'tokenforce'){
@@ -17,7 +21,7 @@ if(isset($_GET['call'])){
     }else if($_GET['call'] == 'productgroups'){
         echo $albis->getProductGroups();
     }else if($_GET['call'] == 'getApp'){
-        $obj = $albis->findApplication($_GET['id'],RETURN_TYPE_OBJECT);
+        $obj = $albis->findApplication($_GET['id'],$config->GET_RETURN_TYPE_OBJECT());
         echo json_encode($obj);
     }else if($_GET['call'] == 'saveApp'){
         $obj = Albis::getRequestBodyJSONArray();
@@ -27,7 +31,7 @@ if(isset($_GET['call'])){
     exit();
 }
 if(isset($_GET['doc_get'])){
-    $albis = new Albis\Sdk\Albis();
+    $albis = new Albis\Sdk\Albis($config);
     $bas64 = $albis->getDocuments($_GET['applicationId'],$_GET['purchasePrice'],$_GET['iban'],$_GET['rate']);
     header('Content-Description: File Transfer');
     header("Content-type: application/octet-stream");

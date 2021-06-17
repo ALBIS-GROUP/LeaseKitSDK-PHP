@@ -1,37 +1,10 @@
 <?php
 namespace Albis\Sdk;
-@session_start();
+if(session_status() != PHP_SESSION_ACTIVE){
+    session_start();
+}
 //timeout in seconds as per albis specification
 set_time_limit(120);
-
-//-------------- final constants -------------
-define("SDK_VERSION","v1");
-/** set to true to echo information regarding sent requests */
-define("DEBUG_REQUESTS",false);
-/** points to folder for configuration includes */
-define("IMPORT_FOLDER","./inc/");
-/** integer constant to return albis requests as raw text */
-define("RETURN_TYPE_RAW",0);
-/** integer constant to return albis requests as php object */
-define("RETURN_TYPE_OBJECT",1);
-/** integer constant to return albis requests as associative array */
-define("RETURN_TYPE_ASSOC",2);
-/** definition of standard return type for requests.
-Changing this might have unintented consequences in productive environments! */
-define("RETURN_TYPE_STANDARD",RETURN_TYPE_RAW);
-/** integer constant for the Albis document type "Identity card" */
-define("DOCUMENT_TYPE_IDENTITY_CARD",1);
-/** integer constant for the Albis document type "posession form" */
-define("DOCUMENT_TYPE_ACQUIRED_POSSESSION_FORM",2);
-/** integer constant for the Albis document type "signed contract" */
-define("DOCUMENT_TYPE_SIGNED_CONTRACT",3);
-/** integer constant for the Albis document type "debit authorization" */
-define("DOCUMENT_TYPE_DEBIT_AUTHORIZATION",4);
-/** integer constant for the Albis document type "miscellaneous" */
-define("DOCUMENT_TYPE_MISC",99);
-//---------------- includes ------------------
-require(IMPORT_FOLDER . 'config.php');
-
 
 /**
 * Albis Wrapper class
@@ -49,8 +22,10 @@ class Albis{
     private $localSessionToken;
     /** expiry date of session token, UNIX-Timestamp in seconds */
     private $localSessionTokenExpires;
+    private $config;
 
     /** creates a new Albis-Object.
+    *   @param $albisConfig AlbisConfig-Object with base configuration
     *   @param [$credentials] associative array with credential information
     *     "username" => Albis Username
     *     "password" => Albis Password
@@ -61,14 +36,20 @@ class Albis{
     *                the request body for a JSON that includes those fields
     *   @return Albis object
     */
-    function __construct($credentials = false){
+    function __construct($albisConfig, $credentials = false){
         if($credentials !== false){
             $this->credentials = $credentials;
         }else{//try to get credentials from request body
-            $this->credentials = Albis::getRequestBodyJSONArray();
+             $body = Albis::getRequestBodyJSONArray();
+             $this->credentials = $body;
         }
         $this->localSessionToken = Albis::getStorage('localSessionToken');
         $this->localSessionTokenExpires = Albis::getStorage('localSessionTokenExpires');
+        $this->config = $albisConfig;
+    }
+    
+    function setCredentials($credentials){
+        $this->credentials = $credentials;
     }
 
     /** removes cached session token from cache, if it exists
@@ -84,10 +65,10 @@ class Albis{
     //----------------------- sdk functions --------------------------
     //----------------------------------------------------------------
 
-    /** get the Albis token, either from cache or by requesting a new
+    /** get the Albis token string, either from cache or by requesting a new
     *   one from the Albis endpoint, if $forceRenew is true, no
     *   cached token exists, or current time is after the expiry date
-    *   of cached token
+    *   of cached token. This function will automatically cache the token.
     *   @param [$customCredentials] associative array with custom
     *       credentials (for example see constructor) to use for
     *       authorization with Albis endpoint. If unset or false, takes
@@ -98,6 +79,26 @@ class Albis{
     *           endpoint's side
     */
     function getAlbisToken($customCredentials = false, $forceRenew = false){
+        $responseArray = $this->getTokenArray($customCredentials,$forceRenew);
+        $ret = $responseArray['access_token'];
+        $expiry = time() + $responseArray['expires_in'];
+        return $ret;
+    }
+    
+     /** get the Albis token, either from cache or by requesting a new
+    *   one from the Albis endpoint, if $forceRenew is true, no
+    *   cached token exists, or current time is after the expiry date
+    *   of cached token
+    *   @param [$customCredentials] associative array with custom
+    *       credentials (for example see constructor) to use for
+    *       authorization with Albis endpoint. If unset or false, takes
+    *       credentials given in constructor
+    *   @param [$forceRenew] force renewal of token, ignore cache
+    *   @return associative array with keys acces_token and expires_in
+    *   @throws Exception in case of missing credentials or error on
+    *           endpoint's side
+    */
+    function getTokenArray($customCredentials = false, $forceRenew = false){
         if($customCredentials === false && $this->localSessionToken != null && $this->localSessionTokenExpires != null && $this->localSessionTokenExpires > time() && !$forceRenew){
             return $this->localSessionToken;
         }
@@ -124,22 +125,29 @@ class Albis{
             Albis::error("missing credential fields: " . implode(", ",$missingFieldsArray),4,true);
         }
         //send request and return
-        $rsp = Albis::sendPost('token',$sendJSONArray);
+        $rsp = $this->sendPost('token',$sendJSONArray);
         Albis::setStorage('localSessionTokenRaw',$rsp);
-        $responseArray =  json_decode($rsp,true);
-        if(!isset($responseArray['access_token'])){
+        $ret = json_decode($rsp,true);
+         if(!isset($ret['access_token'])){
             Albis::error("token response doesn't include token: " . $rsp,4,true);
         }
-        if(!isset($responseArray['expires_in'])){
+        if(!isset($ret['expires_in'])){
             Albis::error("token response doesn't include expiry: " . $rsp,3,true);
         }
-        $ret = $responseArray['access_token'];
-        $this->localSessionToken = $ret;
-        Albis::setStorage('localSessionToken',$ret);
-        $expiry = time() + $responseArray['expires_in'];
-        $this->localSessionTokenExpires = $expiry;
-        Albis::setStorage('localSessionTokenExpires',$expiry);
         return $ret;
+    }
+    
+    /*
+    * saves a token to cache. 
+    * @param $tokenString - the token as string
+    * @param $expiryUnixTimestamp - expiry unix timestamp (seconds). Will be reduced by config TOKEN_EXPIRY_GRACE_PERIOD  
+    **/
+    function setToken($tokenString,$expiryUnixTimestamp){
+        $this->localSessionToken = $tokenString;
+        Albis::setStorage('localSessionToken',$tokenString); 
+        $exp = $expiryUnixTimestamp - $this->config->GET_TOKEN_EXPIRY_GRACE_PERIOD();        
+        $this->localSessionTokenExpires = $exp;
+        Albis::setStorage('localSessionTokenExpires',$exp);
     }
 
     /** destroys session cache
@@ -152,59 +160,78 @@ class Albis{
     /** change Albis and auth0-password
     *   @param $albisNewPassword new password for albis
     *   @param $auth0NewPassword new auth0 passwort
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function changePassword($albisNewPassword, $auth0NewPassword, $returnType = RETURN_TYPE_STANDARD){
+    function changePassword($albisNewPassword, $auth0NewPassword, $returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        return Albis::formatJsonReturn(Albis::sendPost('password',array('auth0NewPassword' => $auth0NewPassword,'albisNewPassword' => $albisNewPassword),$token),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('password',array('auth0NewPassword' => $auth0NewPassword,'albisNewPassword' => $albisNewPassword),$token),$returnType);
+    }
+
+    /** synonym for albisPing
+    */
+    function doPing($returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
+        return $this->albisPing();
     }
 
     /** send a test request to Albis
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function doPing($returnType = RETURN_TYPE_STANDARD){
+    function albisPing($returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        return Albis::formatJsonReturn(Albis::sendPost('ping',[],$token, false, "GET"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('ping',[],$token, false, "GET"),$returnType);
+    }
+
+    /** synonym for albisEcho
+    */
+    function doEcho($data, $returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
+        return $this->albisEcho($data,$returnType);
     }
 
     /** send an echo request to Albis
     *   @param $data data to echo back
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function doEcho($data, $returnType = RETURN_TYPE_STANDARD){
+    function albisEcho($data, $returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        return Albis::formatJsonReturn(Albis::sendPost('echo',array("data"=>$data),$token, false, "GET"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('echo',array("data"=>$data),$token, false, "GET"),$returnType);
     }
 
     /** find an Application and return its data
     *   @param $id Albis application id
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function findApplication($id, $returnType = RETURN_TYPE_STANDARD){
+    function findApplication($id, $returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        return Albis::formatJsonReturn(Albis::sendPost('application',array("applicationId"=>$id),$token, false, "GET"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('application',array("applicationId"=>$id),$token, false, "GET"),$returnType);
     }
 
     /** get an Application's status
     *   @param $id Albis application id
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function getApplicationStatus($id, $returnType = RETURN_TYPE_STANDARD){
+    function getApplicationStatus($id, $returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        return Albis::formatJsonReturn(Albis::sendPost('applications-status',array("applicationId"=>$id),$token, false, "GET"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('applications-status',array("applicationId"=>$id),$token, false, "GET"),$returnType);
     }
 
-    /** updates an application 
+    /** updates an application
     *   @param $applicationObject object or associative array with application values.
     *   @param {number} $applicationObject.id - application number, which will be updated
     *   @param {boolean}$applicationObject.contactByEmail - is contact by email required
@@ -227,16 +254,17 @@ class Albis{
     *   @param {string} $applicationObject.provision - defines how much commission, retailer wants to receives for each deal. Possible $applicationObject min: 0, max: 5. Default 0
     *   @param {number} $applicationObject.purchasePrice - purchase price (object value)
     *   @param {number} $applicationObject.rate - rate (returned from getRates() method)
-    *   @param {string} $applicationObject.reference - application reference (helper for shop employees) 
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param {string} $applicationObject.reference - application reference (helper for shop employees)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     */
-    function updateApplication($applicationObject, $returnType = RETURN_TYPE_STANDARD){
+    function updateApplication($applicationObject, $returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        Albis::setApplicationObjectStandardValues($applicationObject);
-        return Albis::formatJsonReturn(Albis::sendPost('application',json_encode($applicationObject),$token, true, "PUT"),$returnType);
+        $this->setApplicationObjectStandardValues($applicationObject);
+        return Albis::formatJsonReturn($this->sendPost('application',json_encode($applicationObject),$token, true, "PUT"),$returnType);
     }
 
-    /** saves (inserts) an application 
+    /** saves (inserts) an application
     *   @param $applicationObject object or associative array with application values.
         *   {Object} $applicationObject - An object with application data
     *   {boolean} $applicationObject.contactByEmail - is contact by email required
@@ -277,50 +305,52 @@ class Albis{
     *   {string} $applicationObject.retailer.zipCode - retailer (supplier) zip code
     *   {string} $applicationObject.receiverEndpoint - endpoint address where requests about application/documentation updates should be delivered (optional)
     *   {Object[]} $applicationObject.receiverFailEmails - array of string emails where info about connection with reveiver endpoint should be delivered (optional)
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     */
-    function saveApplication($applicationObject, $returnType = RETURN_TYPE_STANDARD){
+    function saveApplication($applicationObject, $returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
         Albis::setApplicationObjectStandardValues($applicationObject);
-        return Albis::formatJsonReturn(Albis::sendPost('application',json_encode($applicationObject),$token, true, "POST"),$returnType);
-    }                
-    
+        return Albis::formatJsonReturn($this->sendPost('application',json_encode($applicationObject),$token, true, "POST"),$returnType);
+    }
+
     /** returns payment method definitions
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function getPaymentMethods($returnType = RETURN_TYPE_STANDARD){
+    function getPaymentMethods($returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        return Albis::formatJsonReturn(Albis::sendPost('payment-methods',[],$token, false, "GET"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('payment-methods',[],$token, false, "GET"),$returnType);
     }
 
     /** returns contract type definitions
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function getContractTypes($returnType = RETURN_TYPE_STANDARD){
+    function getContractTypes($returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        return Albis::formatJsonReturn(Albis::sendPost('contract-types',[],$token, false, "GET"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('contract-types',[],$token, false, "GET"),$returnType);
     }
 
-    static function setApplicationObjectStandardValues(&$applicationObject){
-        global $STANDARD_APPLICATION_VALUES;
-        if($STANDARD_APPLICATION_VALUES == null){
+    function setApplicationObjectStandardValues(&$applicationObject){
+        if($$this->config->GET_STANDARD_APPLICATION_VALUES() == null){
             return;
         }
-        if(!is_array($STANDARD_APPLICATION_VALUES)){
+        if(!is_array($$this->config->GET_STANDARD_APPLICATION_VALUES())){
             return;
         }
         if(is_array($applicationObject)){
-            foreach($STANDARD_APPLICATION_VALUES as $key => $value){
+            foreach($$this->config->GET_STANDARD_APPLICATION_VALUES() as $key => $value){
                 if(!isset($applicationObject[$key])){
                      $applicationObject[$key] = $value;
                 }
             }
         }elseif(is_object($applicationObject)){
-            foreach($STANDARD_APPLICATION_VALUES as $key => $value){
+            foreach($$this->config->GET_STANDARD_APPLICATION_VALUES() as $key => $value){
                 if(!isset($applicationObject->$key)){
                      $applicationObject->$key = $value;
                 }
@@ -329,13 +359,14 @@ class Albis{
     }
 
     /** returns legal form definitions
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function getLegalForms($returnType = RETURN_TYPE_STANDARD){
+    function getLegalForms($returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        return Albis::formatJsonReturn(Albis::sendPost('legal-forms',[],$token, false, "GET"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('legal-forms',[],$token, false, "GET"),$returnType);
     }
 
     /** get rates from Albis via associative array (variant of gerRates)
@@ -347,13 +378,14 @@ class Albis{
     *       "productGroup" id of product group
     *       "purchasePrice" amount of purchase price
     *       "provision" provision type id
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function getRatesByAssoc($assoc, $returnType = RETURN_TYPE_STANDARD){
+    function getRatesByAssoc($assoc, $returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        return Albis::formatJsonReturn(Albis::sendPost('rate',$assoc,$token, false, "GET"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('rate',$assoc,$token, false, "GET"),$returnType);
     }
 
     /** get rates from Albis
@@ -364,11 +396,12 @@ class Albis{
     *   @param $productGroup id of product group
     *   @param $purchasePrice amount of purchase price
     *   @param $provision provision type id
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function getRates($contractType,$downPayment,$object,$paymentMethod,$productGroup,$purchasePrice,$provision,$returnType = RETURN_TYPE_STANDARD){
+    function getRates($contractType,$downPayment,$object,$paymentMethod,$productGroup,$purchasePrice,$provision,$returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $valueArray = array('contractType' =>$contractType,
                             'downPayment' =>$downPayment,
                             'object' =>$object,
@@ -381,23 +414,25 @@ class Albis{
     }
 
     /** returns salutation definitions
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function getSalutations($returnType = RETURN_TYPE_STANDARD){
+    function getSalutations($returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        return Albis::formatJsonReturn(Albis::sendPost('salutations',[],$token, false, "GET"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('salutations',[],$token, false, "GET"),$returnType);
     }
 
     /** returns product group definitions
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function getProductGroups($returnType = RETURN_TYPE_STANDARD){
+    function getProductGroups($returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
-        return Albis::formatJsonReturn(Albis::sendPost('product-groups',[],$token, false, "GET"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('product-groups',[],$token, false, "GET"),$returnType);
     }
 
     /** returns document (PDF) as base64 string (variant of getDocuments)
@@ -411,7 +446,7 @@ class Albis{
     */
     function getDocumentsByAssoc($assoc){
         $token = $this->getAlbisToken();
-        $jso = Albis::sendPost('documents',$assoc,$token, false, "GET");
+        $jso = $this->sendPost('documents',$assoc,$token, false, "GET");
         $ret = json_decode($jso);
         return $ret->result;
     }
@@ -447,20 +482,21 @@ class Albis{
     }
 
     /** uploads documents to an existing application
-    *   @param $applicationId Albis application id    
+    *   @param $applicationId Albis application id
     *   @param $documentArray array of document objects or associative arrays
     *   @param {number} $documentArray[].art - document type number (possible values: 1 for Identity card, 2 for Acquired possession form, 3 for Signed contract, 4 for Direct debit authorization, 99 for miscellaneous)
     *   @param {string} $documentArray[].ext - file extension (possible values: 'pdf', 'jpg', 'jpeg', 'png')
     *   @param {string} $documentArray[].doc - string created by file encoding using base64
-    *   @param [$returnType] requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     */
-    function uploadDocuments($applicationId,$documentArray,$returnType = RETURN_TYPE_STANDARD){
+    function uploadDocuments($applicationId,$documentArray,$returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
           if(!is_array($documentArray)){
               $documentArray = [$documentArray];
           }
           $assoc = array('id' => $applicationId,
                         'documents' => $documentArray);
-          return Albis::formatJsonReturn(Albis::sendPost('documents',$assoc,$token),$returnType);
+          return Albis::formatJsonReturn($this->sendPost('documents',$assoc,$token),$returnType);
     }
 
     //----------------------------------------------------------------
@@ -500,17 +536,17 @@ class Albis{
     /** transfers / formats a given JSON-String into either a raw text,
     *   an associative array or a php-object
     *   @param $json the json string to be formatted
-    *   @param $returnType requested return type (RETURN_TYPE_RAW,RETURN_TYPE_OBJECT,RETURN_TYPE_ASSOC)
+    *   @param $returnType requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     */
     function formatJsonReturn($json,$returnType){
-        if($returnType == RETURN_TYPE_OBJECT){
+        if($returnType == $this->config->GET_RETURN_TYPE_OBJECT()){
             $ret = json_decode($json);
             if(isset($ret->result)){
                 $ret = $ret->result;
             }
             return $ret;
         }
-        if($returnType == RETURN_TYPE_ASSOC){
+        if($returnType == $this->config->GET_RETURN_TYPE_ASSOC()){
             $ret = json_decode($json,true);
             if(isset($ret['result'])){
                 $ret = $ret['result'];
@@ -530,7 +566,7 @@ class Albis{
     }
 
     /** creates an associative array to be used in the SDK for uploading documents
-    *   @param $fileType type id of document type - either DOCUMENT_TYPE_IDENTITY_CARD,
+    *   @param $fileType type id of document type - either AbasConfig->DOCUMENT_TYPE_IDENTITY_CARD,
     *       DOCUMENT_TYPE_ACQUIRED_POSSESSION_FORM,DOCUMENT_TYPE_SIGNED_CONTRACT,
     *       DOCUMENT_TYPE_DEBIT_AUTHORIZATION or DOCUMENT_TYPE_MISC
     *   @param $fileExtension the File Extension
@@ -555,7 +591,7 @@ class Albis{
     }
 
     /** creates an associative array to be used in the SDK for uploading documents
-    *   @param $fileType type id of document type - either DOCUMENT_TYPE_IDENTITY_CARD,
+    *   @param $fileType type id of document type - either AbasConfig->DOCUMENT_TYPE_IDENTITY_CARD,
     *       DOCUMENT_TYPE_ACQUIRED_POSSESSION_FORM,DOCUMENT_TYPE_SIGNED_CONTRACT,
     *       DOCUMENT_TYPE_DEBIT_AUTHORIZATION or DOCUMENT_TYPE_MISC
     *   @param $fileExtension the File Extension
@@ -590,17 +626,16 @@ class Albis{
     *   @return string of complete endpoint
     *   @throws Exception if version is not "staging" nor a numeric value identical to the SDK version
     */
-    static function getEndpoint($call){
-        global $ENDPOINT,$API_STAGE;
-        Albis::checkVersion($API_STAGE);
-        return $ENDPOINT . '/' . $API_STAGE . '/' . $call;
+    function getEndpoint($call){
+        $this->checkVersion($this->config->GET_API_STAGE());
+        return $this->config->GET_ENDPOINT() . '/' . $this->config->GET_API_STAGE() . '/' . $call;
     }
 
     /** tests identity and validity of SDK version
     *   @return void
     *   @throws Exception if version is not "staging" nor a numeric value identical to the SDK version
     */
-    static function checkVersion($version){
+    function checkVersion($version){
        // if(1 !== preg_match('/^v[0-9]+$|^staging$/',$version)){
        //Regex unneccessarily slow; doing it by hand
         $vld = $version == 'staging';
@@ -614,13 +649,13 @@ class Albis{
                         $vld = false;
                         break;
                     }
-                }  
+                }
             }
         }
         if(!$vld){
             Albis::error('invalid API-Version: ' . $version,2,true);
         }
-        if(!($version == SDK_VERSION || $version == 'staging')){
+        if(!($version == $this->config->GET_SDK_VERSION() || $version == 'staging')){
             Albis::error('Package version does not match API version',2,true);
         }
     }
@@ -633,10 +668,8 @@ class Albis{
     *   @param [$method] method to use (POST, GET, PUT,...)
     *   @return response body as string
     *   @throws exception in case of problem in sending or receiving (return code != 200).
-    *               if setting $USE_CURL is set to true, exception will contain a JSON with Error-Information from Albis
-    */
-    static function sendPost($call,$contentToSend,$authToken = false,$isJson = true, $method="POST"){
-        global $USE_CURL;
+       */
+    function sendPost($call,$contentToSend,$authToken = false,$isJson = true, $method="POST"){
         // Create the context for the request
         $content = "";$header = [];
         if($isJson){
@@ -659,57 +692,43 @@ class Albis{
         }
         $headerString = implode(PHP_EOL,$header);
 
-        $url = Albis::getEndpoint($call);
+        $url = $this->getEndpoint($call);
         if($method == "GET" && !$isJson){
             $url .= "?" . $content;
         }
-        if(DEBUG_REQUESTS){
+        if($this->config->GET_DEBUG_REQUESTS()){
             echo 'sending request to ' . $url . "\nwith method " . $method;
             echo "\nHeader:" . $headerString . "\n and content:";
             var_dump($content);
         }
-        if($USE_CURL){
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL,$url);
-            $method = strtoupper($method);
-            if($method == "PUT"){
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
-                curl_setopt($ch, CURLOPT_POSTFIELDS,$content);
-            }elseif($method == "GET"){
-                curl_setopt($ch, CURLOPT_HTTPGET, 1);
-            }elseif($method == "POST"){
-                 curl_setopt($ch, CURLOPT_POST, 1);
-                 curl_setopt($ch, CURLOPT_POSTFIELDS, $content);
-            }
-            curl_setopt($ch, CURLOPT_HTTPHEADER,$header);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            $response = curl_exec($ch);
-            $returnCode =  curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            if($returnCode != 200){
-                $err = $response;
-                if(isset($err) && $err != ""){
-                    $err_obj = json_decode($response);
-                    $err_obj->returnCode = $returnCode;    
-                    $err = json_encode($err_obj);
-                }
-                throw new \Exception($err);
-            }
-            curl_close ($ch);
-            return $response;
-        }else{
-            $context = stream_context_create(array(
-                'http' => array(
-                    'method' => $method,
-                    'header' => $headerString,
-                    'content' => $content
-                )
-            ));
-            $response = file_get_contents($url, false, $context);
-            if ($response === false) {
-                Albis::error("error in request - " . $url . "<br />" . $method . "<br />",3,true);
-            }
-            return $response;
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL,$url);
+        $method = strtoupper($method);
+        if($method == "PUT"){
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
+            curl_setopt($ch, CURLOPT_POSTFIELDS,$content);
+        }elseif($method == "GET"){
+            curl_setopt($ch, CURLOPT_HTTPGET, 1);
+        }elseif($method == "POST"){
+             curl_setopt($ch, CURLOPT_POST, 1);
+             curl_setopt($ch, CURLOPT_POSTFIELDS, $content);
         }
+        curl_setopt($ch, CURLOPT_HTTPHEADER,$header);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $response = curl_exec($ch);
+        $returnCode =  curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if($returnCode != 200){
+            $err = $response;
+            if(isset($err) && $err != ""){
+                $err_obj = json_decode($response);
+                $err_obj->returnCode = $returnCode;
+                $err = json_encode($err_obj);
+            }
+            throw new \Exception($err);
+        }
+        curl_close ($ch);
+        return $response;          
     }
 }
  ?>
