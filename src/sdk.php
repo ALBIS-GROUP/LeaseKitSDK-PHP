@@ -79,10 +79,7 @@ class Albis{
     *           endpoint's side
     */
     function getAlbisToken($customCredentials = false, $forceRenew = false){
-        $responseArray = $this->getTokenArray($customCredentials,$forceRenew);
-        $ret = $responseArray['access_token'];
-        $expiry = time() + $responseArray['expires_in'];
-        return $ret;
+        return $this->getTokenArray($customCredentials,$forceRenew,true)['access_token'];
     }
     
      /** get the Albis token, either from cache or by requesting a new
@@ -94,13 +91,14 @@ class Albis{
     *       authorization with Albis endpoint. If unset or false, takes
     *       credentials given in constructor
     *   @param [$forceRenew] force renewal of token, ignore cache
+    *   @param [$saveToStorage] save token to storage
     *   @return associative array with keys acces_token and expires_in
     *   @throws Exception in case of missing credentials or error on
     *           endpoint's side
     */
-    function getTokenArray($customCredentials = false, $forceRenew = false){
+    function getTokenArray($customCredentials = false, $forceRenew = false, $saveToStorage = false){
         if($customCredentials === false && $this->localSessionToken != null && $this->localSessionTokenExpires != null && $this->localSessionTokenExpires > time() && !$forceRenew){
-            return $this->localSessionToken;
+            return array('access_token'=>$this->localSessionToken,'expires_in'=>$this->localSessionTokenExpires);
         }
         //--- get new token ---
         $mandatoryFieldsArray = ['username','password','auth0Username','auth0Password','realm'];
@@ -128,11 +126,15 @@ class Albis{
         $rsp = $this->sendPost('token',$sendJSONArray);
         Albis::setStorage('localSessionTokenRaw',$rsp);
         $ret = json_decode($rsp,true);
-         if(!isset($ret['access_token'])){
+        if(!isset($ret['access_token'])){
             Albis::error("token response doesn't include token: " . $rsp,4,true);
         }
         if(!isset($ret['expires_in'])){
             Albis::error("token response doesn't include expiry: " . $rsp,3,true);
+        }
+        if($saveToStorage){
+            $expiry = time() + $ret['expires_in'];
+            $this->setToken($ret['access_token'],$expiry);
         }
         return $ret;
     }
@@ -170,13 +172,6 @@ class Albis{
         return Albis::formatJsonReturn($this->sendPost('password',array('auth0NewPassword' => $auth0NewPassword,'albisNewPassword' => $albisNewPassword),$token),$returnType);
     }
 
-    /** synonym for albisPing
-    */
-    function doPing($returnType = false){
-		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
-        return $this->albisPing();
-    }
-
     /** send a test request to Albis
     *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     *   @return response from Albis in requested return type
@@ -186,13 +181,6 @@ class Albis{
 		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
         return Albis::formatJsonReturn($this->sendPost('ping',[],$token, false, "GET"),$returnType);
-    }
-
-    /** synonym for albisEcho
-    */
-    function doEcho($data, $returnType = false){
-		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
-        return $this->albisEcho($data,$returnType);
     }
 
     /** send an echo request to Albis
@@ -337,20 +325,20 @@ class Albis{
     }
 
     function setApplicationObjectStandardValues(&$applicationObject){
-        if($$this->config->GET_STANDARD_APPLICATION_VALUES() == null){
+        if($this->config->GET_STANDARD_APPLICATION_VALUES() == null){
             return;
         }
-        if(!is_array($$this->config->GET_STANDARD_APPLICATION_VALUES())){
+        if(!is_array($this->config->GET_STANDARD_APPLICATION_VALUES())){
             return;
         }
         if(is_array($applicationObject)){
-            foreach($$this->config->GET_STANDARD_APPLICATION_VALUES() as $key => $value){
+            foreach($this->config->GET_STANDARD_APPLICATION_VALUES() as $key => $value){
                 if(!isset($applicationObject[$key])){
                      $applicationObject[$key] = $value;
                 }
             }
         }elseif(is_object($applicationObject)){
-            foreach($$this->config->GET_STANDARD_APPLICATION_VALUES() as $key => $value){
+            foreach($this->config->GET_STANDARD_APPLICATION_VALUES() as $key => $value){
                 if(!isset($applicationObject->$key)){
                      $applicationObject->$key = $value;
                 }
