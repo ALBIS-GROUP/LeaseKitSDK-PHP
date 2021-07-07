@@ -11,9 +11,9 @@ if(isset($_GET['call'])){
     }else if($_GET['call'] == 'tokenforce'){
         echo $albis->getAlbisToken(false,true);
     }else if($_GET['call'] == 'ping'){
-        echo $albis->doPing();
+        echo $albis->albisPing();
     }else if($_GET['call'] == 'echo'){
-        echo $albis->doEcho($_GET['echo']);
+        echo $albis->albisEcho($_GET['echo']);
     }else if($_GET['call'] == 'salutations'){
         echo $albis->getSalutations();
     }else if($_GET['call'] == 'legalforms'){
@@ -32,7 +32,7 @@ if(isset($_GET['call'])){
 }
 if(isset($_GET['doc_get'])){
     $albis = new Albis\Sdk\Albis($config);
-    $bas64 = $albis->getDocuments($_GET['applicationId'],$_GET['purchasePrice'],$_GET['iban'],$_GET['rate']);
+    $bas64 = $albis->getContractDocuments($_GET['applicationId'],$_GET['purchasePrice'],$_GET['iban'],$_GET['rate']);
     header('Content-Description: File Transfer');
     header("Content-type: application/octet-stream");
     header("Content-disposition: attachment; filename=document.pdf");

@@ -423,7 +423,7 @@ class Albis{
         return Albis::formatJsonReturn($this->sendPost('product-groups',[],$token, false, "GET"),$returnType);
     }
 
-    /** returns document (PDF) as base64 string (variant of getDocuments)
+    /** returns document (PDF) as base64 string (variant of getContractDocuments)
     *   @param $assoc associative array with the following fields:
             "applicationId" => Albis application id
     *       "purchasePrice" => the requested purchase price
@@ -432,9 +432,9 @@ class Albis{
     *   @return PDF as base64 string
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function getDocumentsByAssoc($assoc){
+    function getContractDocumentsByAssoc($assoc){
         $token = $this->getAlbisToken();
-        $jso = $this->sendPost('documents',$assoc,$token, false, "GET");
+        $jso = $this->sendPost('contract-documents',$assoc,$token, false, "GET");
         $ret = json_decode($jso);
         return $ret->result;
     }
@@ -447,13 +447,13 @@ class Albis{
     *   @return PDF as base64 string
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function getDocuments($applicationId,$purchasePrice,$iban,$rate){
+    function getContractDocuments($applicationId,$purchasePrice,$iban,$rate){
          $valueArray = array('applicationId' =>$applicationId,
                             'purchasePrice' =>$purchasePrice,
                             'iban' =>$iban,
                             'rate' =>$rate
                         );
-        return $this->getDocumentsByAssoc($valueArray);
+        return $this->getContractDocumentsByAssoc($valueArray);
     }
 
     /** streams base64 String as pdf to the client; exits after finished unless optional parameter is given
@@ -477,14 +477,14 @@ class Albis{
     *   @param {string} $documentArray[].doc - string created by file encoding using base64
     *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     */
-    function uploadDocuments($applicationId,$documentArray,$returnType = false){
+    function uploadContractDocuments($applicationId,$documentArray,$returnType = false){
 		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
           if(!is_array($documentArray)){
               $documentArray = [$documentArray];
           }
           $assoc = array('id' => $applicationId,
                         'documents' => $documentArray);
-          return Albis::formatJsonReturn($this->sendPost('documents',$assoc,$token),$returnType);
+          return Albis::formatJsonReturn($this->sendPost('contract-documents',$assoc,$token),$returnType);
     }
 
     //----------------------------------------------------------------
