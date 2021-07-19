@@ -249,7 +249,7 @@ class Albis{
 		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
         $this->setApplicationObjectStandardValues($applicationObject);
-        return Albis::formatJsonReturn($this->sendPost('application',json_encode($applicationObject),$token, true, "PUT"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('application',json_encode(Albis::utf8ize($applicationObject)),$token, true, "PUT"),$returnType);
     }
 
     /** saves (inserts) an application
@@ -299,7 +299,7 @@ class Albis{
 		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
         $token = $this->getAlbisToken();
         Albis::setApplicationObjectStandardValues($applicationObject);
-        return Albis::formatJsonReturn($this->sendPost('application',json_encode($applicationObject),$token, true, "POST"),$returnType);
+        return Albis::formatJsonReturn($this->sendPost('application',json_encode(Albis::utf8ize($applicationObject)),$token, true, "POST"),$returnType);
     }
 
     /** returns payment method definitions
@@ -590,6 +590,17 @@ class Albis{
     static function createDocumentObjectArrayByFile($fileType,$fileExtension,$filename){
         if(!is_file($filename))Albis::error("file not found or not a file; please check existence of file and file permissions: " . $filename,3,true);
         return Albis::createDocumentObjectArray($fileType,$fileExtension,base64_encode(file_get_contents($filename)));
+    }
+    
+    static function utf8ize($d) {
+        if (is_array($d)) {
+            foreach ($d as $k => $v) {
+                $d[$k] = Albis::utf8ize($v);
+            }
+        } else if (is_string ($d)) {
+            return utf8_encode($d);
+        }
+        return $d;
     }
 
     /** basic exception wrapper class.
