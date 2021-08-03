@@ -3,7 +3,7 @@ require('sdk.php');
 require('AlbisConfig.php');
 $ENDPOINT = "";
 $API_STAGE = "staging";
-$config = new AlbisConfig($ENDPOINT,$API_STAGE);
+$config = new Albis\Sdk\AlbisConfig($ENDPOINT,$API_STAGE);
 if(isset($_GET['call'])){
     $albis = new Albis\Sdk\Albis($config);
     if($_GET['call'] == 'token'){
