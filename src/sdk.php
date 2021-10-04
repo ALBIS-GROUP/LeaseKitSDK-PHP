@@ -206,6 +206,33 @@ class Albis{
         $token = $this->getAlbisToken();
         return Albis::formatJsonReturn($this->sendPost('application',array("applicationId"=>$id),$token, false, "GET"),$returnType);
     }
+    
+    /** find a frame application and return its data
+    *   @param $id Albis frame application id
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
+    *   @throws Exception if endpoint declines request or problems in token aquisition
+    */
+    function findFrameApplication($id, $returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
+        $token = $this->getAlbisToken();
+        return Albis::formatJsonReturn($this->sendPost('frame-application',array("applicationId"=>$id),$token, false, "GET"),$returnType);
+    }
+    
+    /** finds all sub applications of the indicated frame application
+    *   @param $frameApplicationId id of frame application
+    *   @param [$showExternalStatus] (boolean) indicates if applicationStatusTxt with a description of received application status should be attached to the result set
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
+    *   @throws Exception if endpoint declines request or problems in token aquisition
+    */
+    function findFrameSubApplications($frameApplicationId, $showExternalStatus = false, $returnType = false){
+        if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
+        $token = $this->getAlbisToken();
+        return Albis::formatJsonReturn($this->sendPost('frame-sub-applications',array("applicationId"=>$frameApplicationId,
+                                                                                            "showExternalStatus" => $showExternalStatus
+                                                                                            ),$token, false, "GET"),$returnType);
+    }
 
     /** get an Application's status
     *   @param $id Albis application id
@@ -300,6 +327,66 @@ class Albis{
         $token = $this->getAlbisToken();
         Albis::setApplicationObjectStandardValues($applicationObject);
         return Albis::formatJsonReturn($this->sendPost('application',json_encode(Albis::utf8ize($applicationObject)),$token, true, "POST"),$returnType);
+    }
+    
+    /*
+    @param values	Object	An object with application data
+        [values.contactByEmail]	boolean	indicator that the leasing contract should be sent to the lessee by e-mail after approval. TRUE/FALSE, Default:FALSE (optional)
+        values.contractType	number	contract type (result of getContractTypes() method)
+        [values.downPayment]	number	down payment (optional)
+        [values.iban]	string	IBAN of account to be charged with contract instalments (may be entered with spaces) (optional)
+        values.frameApplicationId	number	a frame application id
+        values.lessee	Object	lessee data
+        values.lessee.city	string	lessee city
+        values.lessee.email	string	lessee email
+        values.lessee.legalForm	number	lessee legal form
+        values.lessee.name	string	lessee name
+        values.lessee.phoneNumber	string	lessee phone number
+        values.lessee.street	string	lessee street
+        values.lessee.zipCode	string	lessee zip code
+        values.lessee.manager	Object	lessee's manager data
+        values.lessee.manager.birthDate	string	lessee's manager birth date (format required: "YYYY-MM-DD")
+        values.lessee.manager.city	string	lessee's manager city
+        [values.lessee.manager.faxNumber]	string	lessee's manager phone number (optional)
+        values.lessee.manager.firstName	string	lessee's manager first name
+        values.lessee.manager.lastName	string	lessee's manager last name
+        [values.lessee.manager.phoneNumber]	string	lessee's manager phone number (optional)
+        values.lessee.manager.salutation	number	lessee's manager salutation form (result of getSalutations() method)
+        values.lessee.manager.street	string	lessee's manager street
+        values.lessee.manager.zipCode	string	lessee's manager zip code
+        values.leaseTerm	number	lease term (returned from getRates() method)
+        values.object	string	name of the object (80 char max)
+        values.paymentMethod	number	payment method (result of getPaymentMethods() method)
+        values.productGroup	number	product group (is a part of "credentials". Can be assigned by Albis only)
+        [values.promotionId]	string	lease term (returned from getRates() if conditions matched any promotion) (optional)
+        values.purchasePrice	number	purchase price (object value)
+        values.rate	number	rate (returned from getRates() method)
+        [values.reference]	string	application reference (helper for shop employees) (optional)
+        [values.receiverEndpoint]	string	endpoint address where requests about application/documentation updates should be delivered (optional)
+        [values.receiverFailEmails]	Array.<String>	array of string emails where info about connection with reveiver endpoint should be delivered (optional)
+        [values.receiverToken]	string	a string, which can be used by a client to ensure that the notification concerns his application (optional)
+        [values.residualValuePercent]	number	required if contract type equals 2 (optional)
+        [values.serviceFee]	number	required if contract type equals 7 or 12 (optional)
+    */
+    function saveFrameSubApplication($values,$returnType = false){
+        if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
+        $token = $this->getAlbisToken();
+        return Albis::formatJsonReturn($this->sendPost('frame-sub-applications',json_encode(Albis::utf8ize($values)),$token, false, "POST"),$returnType);
+    }
+
+    /** sets application status to canceled
+    *   @param [$applicationId] id of application to cancel
+    *   @param [$cancelationReason] id of cancellation reason. Can be left empty
+    *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
+    *   @return response from Albis in requested return type
+    *   @throws Exception if endpoint declines request or problems in token aquisition
+    */
+    function deleteApplication($applicationId,$cancelationReason = false, $returnType = false){
+		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
+        $token = $this->getAlbisToken();
+        $parameterArray = array("applicationId"=>$applicationId);
+        if($cancelationReason !== false)$parameterArray['cancelationReason'] = $cancelationReason;
+        return Albis::formatJsonReturn($this->sendPost('application',$parameterArray,$token, false, "DELETE"),$returnType);
     }
 
     /** returns payment method definitions
@@ -399,6 +486,27 @@ class Albis{
                             'provision' =>$provision
                         );
         return $this->getRatesByAssoc($valueArray,$returnType);
+    }
+    
+    //TODO: documentation
+    function getFrameRates($applicationId, $purchasePrice, $productGroup, $downPayment, $contractType, $paymentMethod,$returnType = false){
+        if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
+        $valueArray = array('applicationId' => $applicationId,
+                            'purchasePrice' =>$purchasePrice,
+                            'productGroup' =>$productGroup,
+                            'downPayment' =>$downPayment,
+                            'contractType' =>$contractType,
+                            'paymentMethod' =>$paymentMethod
+                        );
+        return $this->getFrameRatesByAssoc($valueArray,$returnType);
+        
+    }
+    
+    //TODO: documentation
+    function getFrameRatesByAssoc($assoc,$returnType = false){
+        if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
+        $token = $this->getAlbisToken();
+        return Albis::formatJsonReturn($this->sendPost('frame-rates',$assoc,$token, false, "GET"),$returnType);
     }
 
     /** returns salutation definitions
@@ -692,7 +800,7 @@ class Albis{
         $headerString = implode(PHP_EOL,$header);
 
         $url = $this->getEndpoint($call);
-        if($method == "GET" && !$isJson){
+        if(($method == "GET" || $method == "DELETE") && !$isJson){
             $url .= "?" . $content;
         }
         if($this->config->GET_DEBUG_REQUESTS()){
