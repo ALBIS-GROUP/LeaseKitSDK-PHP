@@ -311,13 +311,6 @@ class Albis{
     *   {number} $applicationObject.rate - rate (returned from getRates() method)
     *   {number} $applicationObject.rateWithInsurance - rate with insurance (returned from getRates() method)
     *   {string} $applicationObject.reference - application reference (helper for shop employees)
-    *   {Object} $applicationObject.retailer - retailer (supplier) data - a company, which stores the object
-    *   {string} $applicationObject.retailer.city - retailer (supplier) city
-    *   {string} $applicationObject.retailer.email - retailer (supplier) email
-    *   {string} $applicationObject.retailer.name - retailer (supplier) name
-    *   {string} $applicationObject.retailer.street - retailer (supplier) street
-    *   {string} $applicationObject.retailer.telnr - retailer (supplier) phone number
-    *   {string} $applicationObject.retailer.zipCode - retailer (supplier) zip code
     *   {string} $applicationObject.receiverEndpoint - endpoint address where requests about application/documentation updates should be delivered (optional)
     *   {Object[]} $applicationObject.receiverFailEmails - array of string emails where info about connection with reveiver endpoint should be delivered (optional)
     *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
