@@ -527,13 +527,12 @@ class Albis{
     /** returns document (PDF) as base64 string (variant of getContractDocuments)
     *   @param $assoc associative array with the following fields:
             "applicationId" => Albis application id
-    *       "purchasePrice" => the requested purchase price
-    *       "iban" => IBAN to be referenced by the document
-    *       "rate" => payment rate
+            OR just the application Id as String
     *   @return PDF as base64 string
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
     function getContractDocumentsByAssoc($assoc){
+        if(!is_array($assoc))$assoc = array('applicationId' => $assoc);
         $token = $this->getAlbisToken();
         $jso = $this->sendPost('contract-documents',$assoc,$token, false, "GET");
         $ret = json_decode($jso);
@@ -548,12 +547,8 @@ class Albis{
     *   @return PDF as base64 string
     *   @throws Exception if endpoint declines request or problems in token aquisition
     */
-    function getContractDocuments($applicationId,$purchasePrice,$iban,$rate){
-         $valueArray = array('applicationId' =>$applicationId,
-                            'purchasePrice' =>$purchasePrice,
-                            'iban' =>$iban,
-                            'rate' =>$rate
-                        );
+    function getContractDocuments($applicationId){
+         $valueArray = array('applicationId' =>$applicationId);
         return $this->getContractDocumentsByAssoc($valueArray);
     }
 
@@ -584,9 +579,10 @@ class Albis{
           if(!is_array($documentArray)){
               $documentArray = [$documentArray];
           }
-          $assoc = array('id' => $applicationId,
+          $assoc = array('applicationId' => $applicationId,
                         'documents' => $documentArray);
-          return Albis::formatJsonReturn($this->sendPost('contract-documents',$assoc,$token),$returnType);
+          
+          return Albis::formatJsonReturn($this->sendPost('contract-documents',$assoc,$token,true),$returnType);
     }
 
     //----------------------------------------------------------------
@@ -656,27 +652,36 @@ class Albis{
     }
 
     /** creates an associative array to be used in the SDK for uploading documents
-    *   @param $fileType type id of document type - either AbasConfig->DOCUMENT_TYPE_IDENTITY_CARD,
+    *   @param $fileType array of type ids of document types - either AbasConfig->DOCUMENT_TYPE_IDENTITY_CARD,
     *       DOCUMENT_TYPE_ACQUIRED_POSSESSION_FORM,DOCUMENT_TYPE_SIGNED_CONTRACT,
     *       DOCUMENT_TYPE_DEBIT_AUTHORIZATION or DOCUMENT_TYPE_MISC
-    *   @param $fileExtension the File Extension
-    *   @param $data the file's data, either as byte array or as base64 string
+    *   @param $fileExtension array of File Extensions
+    *   @param $data array of the files' data, either as byte array or as base64 string
     *   @return associative array
     */
     static function createDocumentObjectArray($fileType,$fileExtension,$data){
-        $base64 = null;
-        if(is_array($data)){
-            $byteString = "";
-            foreach($data as $byte){
-                $byteString .= pack('C',$byte);
-            }
-            $base64 = base64_encode($byteString);
-        }else{
-            $base64 = $data;
+        if(!is_array($fileType)){
+            $fileType = [$fileType]; 
+            $fileExtension = [$fileExtension]; 
+            $data = [$data]; 
         }
-        $ret = array('art' => $fileType,
-                     'ext' => $fileExtension,
-                     'doc' => $base64);
+        $ret = [];
+        
+        foreach($data as $k => $dat){
+            $base64 = null;
+            if(is_array($dat)){
+                $byteString = "";
+                foreach($dat as $byte){
+                    $byteString .= pack('C',$byte);
+                }
+                $base64 = base64_encode($byteString);
+            }else{
+                $base64 = $dat;
+            }
+            array_push($ret, array('art' => $fileType[$k],
+                         'ext' => $fileExtension[$k],
+                         'doc' => $base64));
+        }
         return $ret;
     }
 
