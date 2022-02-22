@@ -579,7 +579,8 @@ class Albis{
     *   @param [$returnType] requested return type (AbasConfig->RETURN_TYPE_RAW,AbasConfig->RETURN_TYPE_OBJECT,AbasConfig->RETURN_TYPE_ASSOC)
     */
     function uploadContractDocuments($applicationId,$documentArray,$returnType = false){
-		if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
+	  $token = $this->getAlbisToken();
+	  if($returnType === false)$returnType = $this->config->GET_RETURN_TYPE_STANDARD();
           if(!is_array($documentArray)){
               $documentArray = [$documentArray];
           }
